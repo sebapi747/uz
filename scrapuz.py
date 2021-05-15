@@ -8,11 +8,13 @@ import pandas as pd
 import sys
 import sqlite3
 import matplotlib.pyplot as plt
+import config
 
 
 dirname = os.path.dirname(sys.argv[0])
 if dirname != '':
     os.chdir(dirname)
+remotedir = config.remotedir
 DATABASE= "quotes.db"
 
 ''' ---------------------------------------------------------------------------------------------
@@ -172,8 +174,8 @@ def pltMostLiquid():
 
 def copy_to_web():
     print("copy to web")
-    os.system('rsync -avzhe ssh svg sebapi747@ssh.pythonanywhere.com:/home/sebapi747/marko/static/pics')
-    os.system('rsync -avzhe ssh uzbek*.html sebapi747@ssh.pythonanywhere.com:/home/sebapi747/marko/static/pics')
+    os.system('rsync -avzhe ssh svg %s' % remotedir)
+    os.system('rsync -avzhe ssh uzbek*.html %s' % remotedir)
 
 getAllData()
 readcsv_to_db()
