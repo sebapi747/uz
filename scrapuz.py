@@ -108,6 +108,7 @@ def insertfx():
     print("inserting USDUZS fx")
     x = requests.get('https://finance.yahoo.com/quote/USDUZS=X/')
     print(x.status_code)
+    parsed_body=html.fromstring(x.text)
     fx = float(parsed_body.xpath('//div/span[@data-reactid=32]/text()')[0].replace(",",""))
     ymdstr = dt.datetime.strftime(dt.datetime.utcnow(),'%Y-%m-%d')
     g.db.execute('insert into fx (cob, fx) values (?, ?)', [ymdstr, fx])
@@ -123,7 +124,7 @@ def readcsv_to_db():
 
 def pltMostLiquid():
     print("produce html with most liquid stocks")
-     with open('uzbek-mostliquid.html', 'w') as f:
+    with open('uzbek-mostliquid.html', 'w') as f:
         with open('uzbek-mostliquid-mktcap.html', 'w') as f2:
             with open('uzbek-mostliquid-usd.html', 'w') as f3:
                 dates = pd.read_sql_query("select date from quotes order by date desc", g.db)
@@ -132,14 +133,17 @@ def pltMostLiquid():
                 print('<h1>Prices for most liquid uzbek stocks on %s</h1>' % dates[-1], file=f)
                 print('<h1>Mkt cap for most liquid uzbek stocks on %s</h1>' % dates[-1], file=f2)
                 dates[-1]
-                mostliquid = pd.read_sql_query("select isin, count(*) as ct, name, avg(marketcap) as cap from quotes where date>? group by 1,3 having ct>18 order by 2 desc,4 desc", g.db, params=[prevdate])
+                mostliquid = pd.read_sql_query("select isin, name, sum(date) from quotes group by 1,2 order by 3 desc limit 14", g.db)
+                if len(mostliquid)==0:
+                    return
                 m = mostliquid.iloc[0]
                 for i in range(0,len(mostliquid)):
                     m = mostliquid.iloc[i]
                     df = pd.read_sql_query("select date, price, marketcap/(1.0*fx) as marketcap, price/(1.0*fx) as price_usd from quotes, fx where isin=? and date>? and date=cob", g.db, params=[m['isin'],"2020-01-01"])
                     name = re.sub('\).*', '',re.sub('.*\(', '', m['name']))
+                    df['date'] = pd.to_datetime(df['date'])
                     fig = plt.figure(1)
-                    plt.gca().xaxis.set_major_locator(plt.MultipleLocator(10))
+                    #plt.gca().xaxis.set_major_locator(plt.MultipleLocator(10))
                     plt.gca().axes.set_ylim([0,np.max(df['price'])])
                     plt.xticks(rotation='vertical')
                     plt.plot(df['date'],df['price'])
@@ -149,7 +153,7 @@ def pltMostLiquid():
                     #plt.show()
                     plt.close(fig)
                     fig = plt.figure(1)
-                    plt.gca().xaxis.set_major_locator(plt.MultipleLocator(10))
+                    #plt.gca().xaxis.set_major_locator(plt.MultipleLocator(10))
                     plt.gca().axes.set_ylim([0,np.max(df['marketcap'])])
                     plt.xticks(rotation='vertical')
                     plt.plot(df['date'],df['marketcap'])
@@ -159,7 +163,7 @@ def pltMostLiquid():
                     #plt.show()
                     plt.close(fig)
                     fig = plt.figure(1)
-                    plt.gca().xaxis.set_major_locator(plt.MultipleLocator(10))
+                    #plt.gca().xaxis.set_major_locator(plt.MultipleLocator(10))
                     plt.gca().axes.set_ylim([0,np.max(df['price_usd'])])
                     plt.xticks(rotation='vertical')
                     plt.plot(df['date'],df['price_usd'])
