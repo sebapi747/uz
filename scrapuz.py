@@ -46,7 +46,7 @@ def init_sql_schema():
 def getAllIsins():
     detailslink = []
     for i in range(1,4):
-        x = requests.get('https://uzse.uz/isu_infos?locale=en&page=%d' % i)
+        x = requests.get('https://uzse.uz/isu_infos?locale=en&page=%d' % i, verify=False)
         print("page %d %d" % (i,x.status_code))
         soup = BeautifulSoup(x.text, 'html.parser')
         for tag in set(soup.find_all('a')):
@@ -60,7 +60,7 @@ def getAllIsins():
 # get details info for given link
 def getDetailsInfo(d,datestring=None):
     isin = d[11:].replace(r"/detail","")
-    x = requests.get('https://uzse.uz' + d + '?locale=en')
+    x = requests.get('https://uzse.uz' + d + '?locale=en', verify=False)
     print(x.status_code)
     if datestring is not None:
         file = open("html/"+datestring+"/"+isin+".html", "w")
@@ -106,10 +106,11 @@ def getAllData():
 
 def insertfx():
     print("inserting USDUZS fx")
-    x = requests.get('https://finance.yahoo.com/quote/USDUZS=X/')
+    headers = {'accept':'*/*', 'user-agent': 'Mozilla/5.0 (X11; Linux armv7l) AppleWebKit/537.36 (KHTML, like Gecko) Raspbian Chromium/78.0.3904.108 Chrome/78.0.3904.108 Safari/537.36'}
+    x = requests.get('https://finance.yahoo.com/quote/USDUZS=X/', headers=headers)
     print(x.status_code)
     parsed_body=html.fromstring(x.text)
-    fx = float(parsed_body.xpath('//div/span[@data-reactid=32]/text()')[0].replace(",",""))
+    fx = float(parsed_body.xpath('//div/span[@data-reactid=31]/text()')[0].replace(",",""))
     ymdstr = dt.datetime.strftime(dt.datetime.utcnow(),'%Y-%m-%d')
     g.db.execute('insert into fx (cob, fx) values (?, ?)', [ymdstr, fx])
     g.db.commit()
@@ -148,7 +149,7 @@ def pltMostLiquid():
                     plt.xticks(rotation='vertical')
                     plt.plot(df['date'],df['price'])
                     plt.ylabel('price (UZS)')
-                    plt.title(name)
+                    plt.title("%s\n%s" % (name, "last:"+str(np.max(df['date']))[:10]))
                     plt.savefig('svg/'+ m['isin']+'-price.svg')
                     #plt.show()
                     plt.close(fig)
@@ -158,7 +159,7 @@ def pltMostLiquid():
                     plt.xticks(rotation='vertical')
                     plt.plot(df['date'],df['marketcap'])
                     plt.ylabel('market cap (USD)')
-                    plt.title(name)
+                    plt.title("%s\n%s" % (name, "last:"+str(np.max(df['date']))[:10]))
                     plt.savefig('svg/'+ m['isin']+'-mktcap.svg')
                     #plt.show()
                     plt.close(fig)
@@ -168,7 +169,7 @@ def pltMostLiquid():
                     plt.xticks(rotation='vertical')
                     plt.plot(df['date'],df['price_usd'])
                     plt.ylabel('price (USD)')
-                    plt.title(name)
+                    plt.title("%s\n%s" % (name, "last:"+str(np.max(df['date']))[:10]))
                     plt.savefig('svg/'+ m['isin']+'-priceusd.svg')
                     #plt.show()
                     plt.close(fig)
