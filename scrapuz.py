@@ -2,7 +2,7 @@ import requests, re
 from bs4 import BeautifulSoup
 from lxml import html
 import datetime as dt
-import os, os.path, glob
+import os, os.path, glob, time
 import numpy as np
 import pandas as pd
 import sys
@@ -60,13 +60,21 @@ def getAllIsins():
 # get details info for given link
 def getDetailsInfo(d,datestring=None):
     isin = d[11:].replace(r"/detail","")
-    x = requests.get('https://uzse.uz' + d + '?locale=en', verify=False)
-    print(x.status_code)
-    if datestring is not None:
-        file = open("html/"+datestring+"/"+isin+".html", "w")
-        file.write(x.text)
+    filename = "html/"+datestring+"/"+isin+".html"
+    if os.path.exists(filename):
+        file = open(filename, "r")
+        text = file.read()
         file.close()
-    return x.text, isin
+        return text, isin
+    else:
+        x = requests.get('https://uzse.uz' + d + '?locale=en', verify=False)
+        print(x.status_code)
+        if datestring is not None:
+            file = open(filename, "w")
+            file.write(x.text)
+            file.close()
+        time.sleep(1)
+        return x.text, isin
 
 def getAllData():
     ymdstr = dt.datetime.strftime(dt.datetime.utcnow(),'%Y%m%d')
@@ -81,7 +89,7 @@ def getAllData():
     marketcaps = []
     names = []
     for d in getAllIsins():
-        htmltext, isin = getDetailsInfo(d)
+        htmltext, isin = getDetailsInfo(d, ymdstr)
         parsed_body=html.fromstring(htmltext)
         try:
             td = parsed_body.xpath('//table[1]/thead/tr[3]/td/text()')
@@ -105,18 +113,22 @@ def getAllData():
     #insert_df_to_table(df, 'quotes', list(df.columns))
 
 def insertfx():
-    print("inserting USDUZS fx")
-    headers = {'accept':'*/*', 'user-agent': 'Mozilla/5.0 (X11; Linux armv7l) AppleWebKit/537.36 (KHTML, like Gecko) Raspbian Chromium/78.0.3904.108 Chrome/78.0.3904.108 Safari/537.36'}
-    x = requests.get('https://finance.yahoo.com/quote/USDUZS=X/', headers=headers)
-    print(x.status_code)
-    parsed_body=html.fromstring(x.text)
-    fx = float(parsed_body.xpath('//div/span[@data-reactid=31]/text()')[0].replace(",",""))
-    ymdstr = dt.datetime.strftime(dt.datetime.utcnow(),'%Y-%m-%d')
-    g.db.execute('insert into fx (cob, fx) values (?, ?)', [ymdstr, fx])
-    g.db.commit()
-    
+    try:
+        print("inserting USDUZS fx")
+        headers = {'accept':'*/*', 'user-agent': 'Mozilla/5.0 (X11; Linux armv7l) AppleWebKit/537.36 (KHTML, like Gecko) Raspbian Chromium/78.0.3904.108 Chrome/78.0.3904.108 Safari/537.36'}
+        x = requests.get('https://finance.yahoo.com/quote/USDUZS=X/', headers=headers)
+        print(x.status_code)
+        parsed_body=html.fromstring(x.text)
+        fx = float(parsed_body.xpath('//div/fin-streamer[@data-symbol="%s"]/text()' % "UZS=X")[0].replace(",",""))
+        #fx = float(parsed_body.xpath('//div/fin-streamer[@data-reactid=29]/text()')[0].replace(",",""))
+        ymdstr = dt.datetime.strftime(dt.datetime.utcnow(),'%Y-%m-%d')
+        print("date=%s fx=%f" % (ymdstr, fx))
+        g.db.execute('insert into fx (cob, fx) values (?, ?)', [ymdstr, fx])
+        g.db.commit()
+    except:
+        pass
+        
 def readcsv_to_db():
-    insertfx()
     filelist = glob.glob('csv/*.csv')
     for f in sorted(filelist):
         df = pd.read_csv(f)
@@ -182,6 +194,7 @@ def copy_to_web():
     os.system('rsync -avzhe ssh svg %s' % remotedir)
     os.system('rsync -avzhe ssh uzbek*.html %s' % remotedir)
 
+insertfx()
 getAllData()
 readcsv_to_db()
 pltMostLiquid()
