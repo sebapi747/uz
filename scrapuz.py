@@ -116,7 +116,7 @@ def insertfx():
     try:
         print("inserting USDUZS fx")
         headers = {'accept':'*/*', 'user-agent': 'Mozilla/5.0 (X11; Linux armv7l) AppleWebKit/537.36 (KHTML, like Gecko) Raspbian Chromium/78.0.3904.108 Chrome/78.0.3904.108 Safari/537.36'}
-        x = requests.get('https://finance.yahoo.com/quote/USDUZS=X/', headers=headers)
+        x = requests.get('https://finance.yahoo.com/quote/UZS=X/', headers=headers)
         print(x.status_code)
         parsed_body=html.fromstring(x.text)
         fx = float(parsed_body.xpath('//div/fin-streamer[@data-symbol="%s"]/text()' % "UZS=X")[0].replace(",",""))
@@ -161,6 +161,7 @@ def pltMostLiquid():
                     plt.xticks(rotation='vertical')
                     plt.plot(df['date'],df['price'])
                     plt.ylabel('price (UZS)')
+                    plt.gcf().autofmt_xdate()
                     plt.title("%s\n%s" % (name, "last:"+str(np.max(df['date']))[:10]))
                     plt.savefig('svg/'+ m['isin']+'-price.svg')
                     #plt.show()
@@ -171,6 +172,7 @@ def pltMostLiquid():
                     plt.xticks(rotation='vertical')
                     plt.plot(df['date'],df['marketcap'])
                     plt.ylabel('market cap (USD)')
+                    plt.gcf().autofmt_xdate()
                     plt.title("%s\n%s" % (name, "last:"+str(np.max(df['date']))[:10]))
                     plt.savefig('svg/'+ m['isin']+'-mktcap.svg')
                     #plt.show()
@@ -181,6 +183,7 @@ def pltMostLiquid():
                     plt.xticks(rotation='vertical')
                     plt.plot(df['date'],df['price_usd'])
                     plt.ylabel('price (USD)')
+                    plt.gcf().autofmt_xdate()
                     plt.title("%s\n%s" % (name, "last:"+str(np.max(df['date']))[:10]))
                     plt.savefig('svg/'+ m['isin']+'-priceusd.svg')
                     #plt.show()
