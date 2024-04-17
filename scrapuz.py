@@ -135,6 +135,9 @@ def readcsv_to_db():
         print("inserting %s - %d quotes" % (f, len(df)))
         insert_df_to_table(df, "quotes", list(df.columns))
 
+def get_metadata():
+    return {'Creator':os.uname()[1] +":"+__file__+":"+str(dt.datetime.utcnow())}
+    
 def pltMostLiquid():
     print("produce html with most liquid stocks")
     with open('uzbek-mostliquid.html', 'w') as f:
@@ -163,7 +166,7 @@ def pltMostLiquid():
                     plt.ylabel('price (UZS)')
                     plt.gcf().autofmt_xdate()
                     plt.title("%s\n%s" % (name, "last:"+str(np.max(df['date']))[:10]))
-                    plt.savefig('svg/'+ m['isin']+'-price.svg')
+                    plt.savefig('svg/'+ m['isin']+'-price.svg',metadata=get_metadata())
                     #plt.show()
                     plt.close(fig)
                     fig = plt.figure(1)
@@ -174,7 +177,7 @@ def pltMostLiquid():
                     plt.ylabel('market cap (USD)')
                     plt.gcf().autofmt_xdate()
                     plt.title("%s\n%s" % (name, "last:"+str(np.max(df['date']))[:10]))
-                    plt.savefig('svg/'+ m['isin']+'-mktcap.svg')
+                    plt.savefig('svg/'+ m['isin']+'-mktcap.svg',metadata=get_metadata())
                     #plt.show()
                     plt.close(fig)
                     fig = plt.figure(1)
@@ -185,7 +188,7 @@ def pltMostLiquid():
                     plt.ylabel('price (USD)')
                     plt.gcf().autofmt_xdate()
                     plt.title("%s\n%s" % (name, "last:"+str(np.max(df['date']))[:10]))
-                    plt.savefig('svg/'+ m['isin']+'-priceusd.svg')
+                    plt.savefig('svg/'+ m['isin']+'-priceusd.svg',metadata=get_metadata())
                     #plt.show()
                     plt.close(fig)
                     print('<img src="svg/%s-price.svg" width="40%%" />' % m['isin'], file=f)
