@@ -17,6 +17,14 @@ if dirname != '':
 remotedir = config.remotedir
 DATABASE= "quotes.db"
 
+def get_metadata():
+    return {'Creator':os.uname()[1] +":"+__file__+":"+str(dt.datetime.utcnow())}
+    
+def sendTelegram(text):
+    prefix = os.uname()[1] + __file__ + ":"
+    params = {'chat_id': config.telegramchatid, 'text': prefix+text, 'parse_mode': 'HTML'}
+    resp = requests.post('https://api.telegram.org/bot{}/sendMessage'.format(config.telegramtoken), params)
+    resp.raise_for_status()
 ''' ---------------------------------------------------------------------------------------------
  SQLite utils
 '''
@@ -46,7 +54,12 @@ def init_sql_schema():
 def getAllIsins():
     detailslink = []
     for i in range(1,4):
-        x = requests.get('https://uzse.uz/isu_infos?locale=en&page=%d' % i, verify=False)
+        url = 'https://uzse.uz/isu_infos?locale=en&page=%d' % i
+        x = requests.get(url, verify=False)
+        if x.status_code!=200:
+            msg = "ERROR:"+url
+            sendTelegram(msg)
+            raise Exception(msg)
         print("page %d %d" % (i,x.status_code))
         soup = BeautifulSoup(x.text, 'html.parser')
         for tag in set(soup.find_all('a')):
@@ -67,8 +80,12 @@ def getDetailsInfo(d,datestring=None):
         file.close()
         return text, isin
     else:
-        x = requests.get('https://uzse.uz' + d + '?locale=en', verify=False)
-        print(x.status_code)
+        url = 'https://uzse.uz' + d + '?locale=en'
+        x = requests.get(url, verify=False)
+        if x.status_code!=200:
+            msg = "ERROR:"+url
+            sendTelegram(msg)
+            raise Exception(msg)
         if datestring is not None:
             file = open(filename, "w")
             file.write(x.text)
@@ -76,6 +93,8 @@ def getDetailsInfo(d,datestring=None):
         time.sleep(1)
         return x.text, isin
 
+def to_scalar(x):
+	return float(x.replace(",","").replace(" ","").replace("\n","").replace("\t",""))
 def getAllData():
     ymdstr = dt.datetime.strftime(dt.datetime.utcnow(),'%Y%m%d')
     dirname = os.path.dirname(sys.argv[0])
@@ -93,9 +112,9 @@ def getAllData():
         parsed_body=html.fromstring(htmltext)
         try:
             td = parsed_body.xpath('//table[1]/thead/tr[3]/td/text()')
-            price = float(td[10].replace(",",""))
+            price = to_scalar(td[10])
             date = dt.date(*map(int, td[11].split('-')))
-            marketcap = float(td[13].replace(",",""))
+            marketcap = to_scalar(td[13])
             th = parsed_body.xpath('//table[1]/thead/tr/th[2]/text()')
             name = th[0].replace("\n","").replace("  ","",-1).replace("<","(").replace(">",")")
             # append
@@ -104,10 +123,10 @@ def getAllData():
             marketcaps.append(marketcap) 
             isins.append(isin)
             names.append(name)
-        except:
-            print("failed for %s" % isin)
+        except Exception as e:
+            print("ERROR: %s failed for %s %s" % (str(e),isin,str(td)))
     df = pd.DataFrame({'isin':isins, 'name':names, 'price':prices, 'date':dates, 'marketcap':marketcaps})
-    print("found %d isin" % len(df))
+    print("INFO:found %d isin" % len(df))
     df.sort_values(by="marketcap", ascending=False).to_html("html/mktcap-%s.html" % ymdstr, index=False)
     df.sort_values(by="marketcap", ascending=False).to_csv("csv/mktcap-%s.csv" % ymdstr, index=False)
     #insert_df_to_table(df, 'quotes', list(df.columns))
@@ -134,9 +153,6 @@ def readcsv_to_db():
         df = pd.read_csv(f)
         print("inserting %s - %d quotes" % (f, len(df)))
         insert_df_to_table(df, "quotes", list(df.columns))
-
-def get_metadata():
-    return {'Creator':os.uname()[1] +":"+__file__+":"+str(dt.datetime.utcnow())}
     
 def pltMostLiquid():
     print("produce html with most liquid stocks")
