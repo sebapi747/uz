@@ -9,8 +9,6 @@ import sys
 import sqlite3
 import matplotlib.pyplot as plt
 import config
-
-
 dirname = os.path.dirname(sys.argv[0])
 if dirname != '':
     os.chdir(dirname)
@@ -42,6 +40,7 @@ def insert_df_to_table(df, tablename, cols):
     sql = 'insert or replace into '+tablename+' ('+','.join(cols)+') select '+','.join(cols)+' from '+tablename+'_tmp'
     g.db.execute(sql)
     g.db.execute('drop table '+tablename+'_tmp')
+    g.db.commit()
 
 def init_sql_schema():
     print("init sql tables")
@@ -82,21 +81,22 @@ def getDetailsInfo(d,datestring=None):
     else:
         url = 'https://uzse.uz' + d + '?locale=en'
         x = requests.get(url, verify=False)
+        time.sleep(1)
         if x.status_code!=200:
-            msg = "ERROR:"+url
+            msg = "ERROR: url=%s code=%d"%(url,x.status_code)
             sendTelegram(msg)
             raise Exception(msg)
         if datestring is not None:
             file = open(filename, "w")
             file.write(x.text)
             file.close()
-        time.sleep(1)
         return x.text, isin
 
 def to_scalar(x):
-	return float(x.replace(",","").replace(" ","").replace("\n","").replace("\t",""))
+    return float(x.replace(",","").replace(" ","").replace("\n","").replace("\t",""))
 def getAllData():
     ymdstr = dt.datetime.strftime(dt.datetime.utcnow(),'%Y%m%d')
+    #ymdstr = "latest"
     dirname = os.path.dirname(sys.argv[0])
     if dirname != '':
         os.chdir(dirname)
@@ -108,9 +108,9 @@ def getAllData():
     marketcaps = []
     names = []
     for d in getAllIsins():
-        htmltext, isin = getDetailsInfo(d, ymdstr)
-        parsed_body=html.fromstring(htmltext)
         try:
+            htmltext, isin = getDetailsInfo(d, ymdstr)
+            parsed_body=html.fromstring(htmltext)
             td = parsed_body.xpath('//table[1]/thead/tr[3]/td/text()')
             price = to_scalar(td[10])
             date = dt.date(*map(int, td[11].split('-')))
@@ -125,26 +125,28 @@ def getAllData():
             names.append(name)
         except Exception as e:
             print("ERROR: %s failed for %s %s" % (str(e),isin,str(td)))
+    os.system("rm -rf html/"+ymdstr)
     df = pd.DataFrame({'isin':isins, 'name':names, 'price':prices, 'date':dates, 'marketcap':marketcaps})
     print("INFO:found %d isin" % len(df))
-    df.sort_values(by="marketcap", ascending=False).to_html("html/mktcap-%s.html" % ymdstr, index=False)
-    df.sort_values(by="marketcap", ascending=False).to_csv("csv/mktcap-%s.csv" % ymdstr, index=False)
+    df.sort_values(by="marketcap", ascending=False).to_csv("csv/mktcap-%s.csv" % "latest", index=False) # ymdstr
     #insert_df_to_table(df, 'quotes', list(df.columns))
 
 def insertfx():
     try:
-        print("inserting USDUZS fx")
+        print("INFO: inserting USDUZS fx")
         headers = {'accept':'*/*', 'user-agent': 'Mozilla/5.0 (X11; Linux armv7l) AppleWebKit/537.36 (KHTML, like Gecko) Raspbian Chromium/78.0.3904.108 Chrome/78.0.3904.108 Safari/537.36'}
         x = requests.get('https://finance.yahoo.com/quote/UZS=X/', headers=headers)
         print(x.status_code)
         parsed_body=html.fromstring(x.text)
-        fx = float(parsed_body.xpath('//div/fin-streamer[@data-symbol="%s"]/text()' % "UZS=X")[0].replace(",",""))
+        #fx = float(parsed_body.xpath('//div/fin-streamer[@data-symbol="%s"]/text()' % "UZS=X")[0].replace(",",""))
+        fx = float(parsed_body.xpath("//fin-streamer[@data-symbol='%s' and @data-field='regularMarketPrice']/@data-value" % "UZS=X")[0].replace(",",""))
         #fx = float(parsed_body.xpath('//div/fin-streamer[@data-reactid=29]/text()')[0].replace(",",""))
         ymdstr = dt.datetime.strftime(dt.datetime.utcnow(),'%Y-%m-%d')
-        print("date=%s fx=%f" % (ymdstr, fx))
+        print("INFO: date=%s fx=%f" % (ymdstr, fx))
         g.db.execute('insert into fx (cob, fx) values (?, ?)', [ymdstr, fx])
         g.db.commit()
     except:
+        sendTelegram("ERR: failed to get UZS fx")
         pass
         
 def readcsv_to_db():
