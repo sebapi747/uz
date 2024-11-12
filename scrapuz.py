@@ -19,7 +19,7 @@ def get_metadata():
     return {'Creator':os.uname()[1] +":"+__file__+":"+str(dt.datetime.utcnow())}
     
 def sendTelegram(text):
-    prefix = os.uname()[1] + __file__ + ":"
+    prefix = os.uname()[1] +":"+ __file__ + ":"
     params = {'chat_id': config.telegramchatid, 'text': prefix+text, 'parse_mode': 'HTML'}
     resp = requests.post('https://api.telegram.org/bot{}/sendMessage'.format(config.telegramtoken), params)
     resp.raise_for_status()
